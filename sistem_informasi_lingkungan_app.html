@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SI-Lingkungan - Sistem Informasi Lingkungan Mobile</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Financial Reports -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        /* Phone frame & layout styling */
+        .mobile-frame {
+            max-width: 440px;
+            height: 880px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(59, 130, 246, 0.15);
+            border: 8px solid #1e293b;
+            border-radius: 40px;
+        }
+
+        /* Panic button radial progress */
+        .panic-btn-wrapper {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        
+        .pulse-alarm {
+            animation: alarmFlash 1s infinite alternate;
+        }
+
+        @keyframes alarmFlash {
+            0% { background-color: rgba(225, 29, 72, 0.9); box-shadow: 0 0 20px #e11d48; }
+            100% { background-color: rgba(159, 18, 57, 0.9); box-shadow: 0 0 40px #f43f5e; }
+        }
+
+        /* Scrollbar aesthetics */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+    <!-- Control Bar (Top) -->
+    <div class="w-full max-w-5xl mb-4 bg-slate-800/80 backdrop-blur border border-slate-700 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-500/20 p-2.5 rounded-xl border border-emerald-500/30 text-emerald-400">
+                <i class="fa-solid fa-tree-city text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base sm:text-lg text-white leading-tight">SI-Lingkungan Mobile</h1>
+                <p class="text-xs text-slate-400">Dusun Melati / Kelurahan Asri - RT 03 / RW 05</p>
+            </div>
+        </div>
+
+        <!-- Role Selector -->
+        <div class="flex items-center space-x-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-700/60">
+            <span class="text-xs font-semibold px-2 text-slate-400">Peran Akun:</span>
+            <button onclick="switchRole('WARGA')" id="btn-role-warga" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-emerald-600 text-white shadow-md">
+                <i class="fa-solid fa-user mr-1"></i> Warga
+            </button>
+            <button onclick="switchRole('KEPLING')" id="btn-role-kepling" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-user-shield mr-1"></i> Kepling (Admin)
+            </button>
+            <button onclick="switchRole('RTRW')" id="btn-role-rtrw" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-user-gear mr-1"></i> Pengurus RT
+            </button>
+        </div>
+
+        <!-- View Mode Switch (Mobile Frame vs Full Dashboard) -->
+        <button onclick="toggleViewMode()" class="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition border border-slate-600 flex items-center gap-1.5">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            <span id="view-mode-text">Tampilan HP Simulator</span>
+        </button>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <div id="app-container" class="mobile-frame w-full bg-slate-900 text-slate-100 flex flex-col overflow-hidden relative transition-all duration-300">
+        
+        <!-- Mobile Status Bar Mock -->
+        <div id="status-bar" class="px-5 py-2 flex justify-between items-center text-xs text-slate-400 border-b border-slate-800 bg-slate-950/50">
+            <span id="clock-time" class="font-semibold text-white">09:41</span>
+            <div class="flex items-center space-x-2">
+                <span id="role-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    WARGA REGULAR
+                </span>
+                <i class="fa-solid fa-wifi text-[11px]"></i>
+                <i class="fa-solid fa-battery-three-quarters text-[11px]"></i>
+            </div>
+        </div>
+
+        <!-- Emergency Alert Live Bar (Hidden by default, shown when panic is triggered) -->
+        <div id="emergency-banner" class="hidden pulse-alarm p-3 text-white flex items-center justify-between z-30 shadow-xl">
+            <div class="flex items-center space-x-2 overflow-hidden">
+                <i class="fa-solid fa-triangle-exclamation text-xl animate-bounce"></i>
+                <div class="truncate">
+                    <p class="text-xs font-bold leading-tight uppercase tracking-wider" id="alert-title">DARURAT DIKELUARKAN!</p>
+                    <p class="text-[11px] opacity-90 truncate" id="alert-subtitle">Budi Santoso - RT 03 (Kebakaran)</p>
+                </div>
+            </div>
+            <button onclick="silenceAlarm()" class="px-2 py-1 bg-white text-rose-700 rounded font-bold text-xs shrink-0 shadow">
+                Matikan
+            </button>
+        </div>
+
+        <!-- APP CONTENT AREA (Scrollable) -->
+        <div id="content-area" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <!-- Content dynamically rendered via JS -->
+        </div>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <div class="border-t border-slate-800 bg-slate-950/90 backdrop-blur p-2 grid grid-cols-5 gap-1 z-20">
+            <button onclick="navigateTo('home')" id="nav-home" class="flex flex-col items-center justify-center py-1.5 text-emerald-400">
+                <i class="fa-solid fa-house text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">Beranda</span>
+            </button>
+            <button onclick="navigateTo('financials')" id="nav-financials" class="flex flex-col items-center justify-center py-1.5 text-slate-400 hover:text-slate-200">
+                <i class="fa-solid fa-wallet text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">Iuran</span>
+            </button>
+
+            <!-- Center Panic Button Quick Trigger -->
+            <button onclick="navigateTo('panic')" id="nav-panic" class="flex flex-col items-center justify-center py-1 text-rose-500 hover:text-rose-400 relative">
+                <div class="w-10 h-10 -mt-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-rose-600/40 border-2 border-slate-900 transition transform hover:scale-105">
+                    <i class="fa-solid fa-bell text-base animate-pulse"></i>
+                </div>
+                <span class="text-[10px] font-bold text-rose-500 mt-0.5">SOS</span>
+            </button>
+
+            <button onclick="navigateTo('services')" id="nav-services" class="flex flex-col items-center justify-center py-1.5 text-slate-400 hover:text-slate-200">
+                <i class="fa-solid fa-file-signature text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">E-Surat</span>
+            </button>
+            <button onclick="navigateTo('hub')" id="nav-hub" class="flex flex-col items-center justify-center py-1.5 text-slate-400 hover:text-slate-200">
+                <i class="fa-solid fa-users text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium">Warga</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- GLOBAL MODAL CONTAINER -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div id="modal-box" class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+            <div id="modal-body">
+                <!-- Dynamic modal content -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- APPLICATION STATE ---
+        const state = {
+            role: 'WARGA', // WARGA, KEPLING, RTRW
+            currentTab: 'home',
+            isFrameView: true,
+            panicActive: false,
+            panicTimer: null,
+            panicPressTime: 0,
+            
+            // Demographic / User Data
+            userProfile: {
+                name: 'Budi Santoso',
+                nik: '1271012903910002',
+                address: 'Jl. Kenanga No. 14, RT 03 / RW 05',
+                status: 'Warga Tetap',
+                kk: '1271011504100088',
+                familyMembers: 4,
+                ktaCode: 'SIL-2026-9921-BD'
+            },
+
+            // Pending registrations for Kepling verification
+            pendingUsers: [
+                { id: 1, name: 'Siti Rahma', nik: '1271015609940003', address: 'Jl. Melati No. 8', status: 'Kontrak', date: '25 Ags 2026' },
+                { id: 2, name: 'Rian Pratama', nik: '1271011202990001', address: 'Jl. Kenanga No. 22', status: 'Indekost', date: '26 Ags 2026' }
+            ],
+
+            // Financial Dues State
+            dues: [
+                { id: 'TRX-001', month: 'Agustus 2026', type: 'Iuran Keamanan & Kebersihan', amount: 35000, status: 'PAID', date: '02 Ags 2026', method: 'QRIS' },
+                { id: 'TRX-002', month: 'September 2026', type: 'Iuran Keamanan & Kebersihan', amount: 35000, status: 'UNPAID', date: '-', method: '-' }
+            ],
+
+            // Public Ledger Summary (Rupiah)
+            ledger: {
+                pemasukan: 14250000,
+                pengeluaran: 8700000,
+                saldo: 5550000,
+                items: [
+                    { id: 1, title: 'Pembayaran Iuran Warga (140 KK)', amount: 4900000, type: 'IN', date: '20 Ags 2026' },
+                    { id: 2, title: 'Perbaikan Lampu Jalan RT 03', amount: 750000, type: 'OUT', date: '18 Ags 2026' },
+                    { id: 3, title: 'Bantuan Kas Pemeliharaan Pos Ronda', amount: 1200000, type: 'OUT', date: '10 Ags 2026' }
+                ]
+            },
+
+            // Ticketing Reports (Lapor Pak Kepling)
+            reports: [
+                { id: 'RPT-101', title: 'Lampu Jalan Utama Mati', location: 'Depan Gang Kenanga 2', reporter: 'Budi Santoso', category: 'Fasilitas', status: 'In Progress', date: '26 Ags 2026', img: 'https://placehold.co/400x250/1e293b/64748b?text=Foto+Lampu+Jalan+Mati' },
+                { id: 'RPT-102', title: 'Penumpukan Sampah Liar', location: 'Lapangan Warga RT 02', reporter: 'Dewi Lestari', category: 'Kebersihan', status: 'Resolved', date: '22 Ags 2026', img: 'https://placehold.co/400x250/1e293b/64748b?text=Foto+Lokasi+Bersih' }
+            ],
+
+            // E-Surat Requests
+            letters: [
+                { id: 'SRT-901', type: 'Surat Keterangan Domisili', applicant: 'Budi Santoso', purpose: 'Persyaratan Pembukaan Rekening Bank', status: 'APPROVED', date: '24 Ags 2026', code: 'SKD/2026/VIII/041' },
+                { id: 'SRT-902', type: 'Surat Keterangan Usaha (SKU)', applicant: 'Budi Santoso', purpose: 'Pengajuan KUR BRI', status: 'PENDING', date: '27 Ags 2026', code: 'SKU/2026/VIII/099' }
+            ],
+
+            // Panic Alerts
+            panicAlerts: [
+                { id: 'SOS-01', user: 'Dewi Lestari', category: 'Kebakaran', location: 'RT 02 (Lat: 3.319, Long: 99.162)', time: '10 Menit Lalu', status: 'ACTIVE' }
+            ],
+
+            // Community Announcements & UMKM Market
+            announcements: [
+                { id: 1, title: 'Gotong Royong Kebersihan Parit Lingkungan', date: 'Minggu, 30 Ags 2026', tag: 'Kegiatan', content: 'Diimbau kepada seluruh warga untuk membawa cangkul dan alat pembersih.' },
+                { id: 2, title: 'Jadwal Imunisasi & Posyandu Balita', date: 'Selasa, 1 Sep 2026', tag: 'Kesehatan', content: 'Pelaksanaan di Poskamling RT 03 mulai pukul 08:30 WIB.' }
+            ],
+            
+            marketItems: [
+                { id: 1, name: 'Nasi Uduk Bu Tejo', price: 10000, seller: 'Bu Tejo (RT 01)', phone: '081234567890', img: 'https://placehold.co/200x200/1e293b/38bdf8?text=Nasi+Uduk' },
+                { id: 2, name: 'Jasa Servis AC Tetangga', price: 75000, seller: 'Pak Joko (RT 03)', phone: '081987654321', img: 'https://placehold.co/200x200/1e293b/38bdf8?text=Servis+AC' }
+            ]
+        };
+
+        // --- WEB AUDIO SYNTHESIZER FOR PANIC ALARM ---
+        let audioCtx = null;
+        let sirenOsc = null;
+        let sirenInterval = null;
+
+        function playPanicSiren() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                sirenOsc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                sirenOsc.type = 'sawtooth';
+                sirenOsc.frequency.setValueAtTime(600, audioCtx.currentTime);
+
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+
+                sirenOsc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                sirenOsc.start();
+
+                let high = false;
+                sirenInterval = setInterval(() => {
+                    if (sirenOsc && audioCtx) {
+                        sirenOsc.frequency.setValueAtTime(high ? 600 : 950, audioCtx.currentTime);
+                        high = !high;
+                    }
+                }, 400);
+            } catch (e) {
+                console.log('Audio Context restricted or not supported:', e);
+            }
+        }
+
+        function stopPanicSiren() {
+            if (sirenInterval) clearInterval(sirenInterval);
+            if (sirenOsc) {
+                try {
+                    sirenOsc.stop();
+                    sirenOsc.disconnect();
+                } catch(e){}
+                sirenOsc = null;
+            }
+        }
+
+        // --- CORE NAVIGATION & SWITCHERS ---
+        function switchRole(newRole) {
+            state.role = newRole;
+            document.querySelectorAll('[id^="btn-role-"]').forEach(btn => {
+                btn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+            });
+            const activeBtn = document.getElementById(`btn-role-${newRole.toLowerCase()}`);
+            if (activeBtn) activeBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-emerald-600 text-white shadow-md";
+
+            const badge = document.getElementById('role-badge');
+            if (newRole === 'KEPLING') {
+                badge.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                badge.textContent = "KEPLING (SUPER ADMIN)";
+            } else if (newRole === 'RTRW') {
+                badge.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30";
+                badge.textContent = "PENGURUS RT/RW";
+            } else {
+                badge.className = "px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                badge.textContent = "WARGA REGULAR";
+            }
+
+            renderCurrentTab();
+        }
+
+        function toggleViewMode() {
+            state.isFrameView = !state.isFrameView;
+            const container = document.getElementById('app-container');
+            const btnText = document.getElementById('view-mode-text');
+
+            if (state.isFrameView) {
+                container.className = "mobile-frame w-full bg-slate-900 text-slate-100 flex flex-col overflow-hidden relative transition-all duration-300";
+                btnText.textContent = "Tampilan HP Simulator";
+            } else {
+                container.className = "w-full max-w-5xl h-[800px] rounded-3xl border border-slate-700 bg-slate-900 text-slate-100 flex flex-col overflow-hidden relative transition-all duration-300 shadow-2xl";
+                btnText.textContent = "Tampilan Layout Lebar";
+            }
+        }
+
+        function navigateTo(tab) {
+            state.currentTab = tab;
+            
+            // Update active state in bottom nav
+            ['home', 'financials', 'panic', 'services', 'hub'].forEach(t => {
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (!navBtn) return;
+                if (t === tab) {
+                    if (t === 'panic') {
+                        navBtn.classList.add('scale-110');
+                    } else {
+                        navBtn.className = "flex flex-col items-center justify-center py-1.5 text-emerald-400 font-bold";
+                    }
+                } else {
+                    if (t === 'panic') {
+                        navBtn.classList.remove('scale-110');
+                    } else {
+                        navBtn.className = "flex flex-col items-center justify-center py-1.5 text-slate-400 hover:text-slate-200 font-normal";
+                    }
+                }
+            });
+
+            renderCurrentTab();
+        }
+
+        function renderCurrentTab() {
+            const area = document.getElementById('content-area');
+            switch(state.currentTab) {
+                case 'home': area.innerHTML = renderHomeView(); break;
+                case 'financials': area.innerHTML = renderFinancialsView(); initLedgerChart(); break;
+                case 'panic': area.innerHTML = renderPanicView(); initPanicListeners(); break;
+                case 'services': area.innerHTML = renderServicesView(); break;
+                case 'hub': area.innerHTML = renderHubView(); break;
+                default: area.innerHTML = renderHomeView();
+            }
+        }
+
+        // --- 1. HOME & DEMOGRAPHICS VIEW ---
+        function renderHomeView() {
+            return `
+                <!-- Greeting Header -->
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-700/80 p-4 rounded-2xl flex justify-between items-center shadow-md">
+                    <div>
+                        <p class="text-xs text-slate-400 font-medium">Selamat Datang,</p>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-1.5">
+                            ${state.userProfile.name}
+                            <i class="fa-solid fa-circle-check text-emerald-400 text-xs" title="Terverifikasi"></i>
+                        </h2>
+                        <p class="text-[11px] text-slate-400">${state.userProfile.address}</p>
+                    </div>
+                    <button onclick="openKTAModal()" class="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition">
+                        <i class="fa-solid fa-qrcode text-lg"></i>
+                        <span>KTA Digital</span>
+                    </button>
+                </div>
+
+                <!-- Admin Action Banner for Kepling -->
+                ${state.role === 'KEPLING' ? `
+                    <div class="bg-amber-500/10 border border-amber-500/30 p-3 rounded-2xl space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-user-clock"></i> Verifikasi Warga Baru (${state.pendingUsers.length})
+                            </span>
+                            <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-semibold">Tugas Kepling</span>
+                        </div>
+                        <div class="space-y-1.5">
+                            ${state.pendingUsers.map(u => `
+                                <div class="bg-slate-800/80 p-2.5 rounded-xl text-xs flex items-center justify-between border border-slate-700">
+                                    <div>
+                                        <p class="font-bold text-slate-200">${u.name} (${u.status})</p>
+                                        <p class="text-[10px] text-slate-400">NIK: ${u.nik} • ${u.address}</p>
+                                    </div>
+                                    <button onclick="approveUser(${u.id})" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-[11px] font-semibold transition">
+                                        Setujui
+                                    </button>
+                                </div>
+                            `).join('')}
+                            ${state.pendingUsers.length === 0 ? `<p class="text-xs text-slate-400 text-center py-1">Tidak ada registrasi pending.</p>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Quick Services Grid -->
+                <div>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Akses Cepat Fitur</h3>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="navigateTo('financials')" class="bg-slate-800 hover:bg-slate-700 border border-slate-700/60 p-3 rounded-2xl flex flex-col items-center text-center group transition">
+                            <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-hand-holding-dollar text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-medium text-slate-300">Bayar Iuran</span>
+                        </button>
+                        <button onclick="navigateTo('services')" class="bg-slate-800 hover:bg-slate-700 border border-slate-700/60 p-3 rounded-2xl flex flex-col items-center text-center group transition">
+                            <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-file-pdf text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-medium text-slate-300">Buat Surat</span>
+                        </button>
+                        <button onclick="openReportModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700/60 p-3 rounded-2xl flex flex-col items-center text-center group transition">
+                            <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-bullhorn text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-medium text-slate-300">Lapor Pak</span>
+                        </button>
+                        <button onclick="navigateTo('hub')" class="bg-slate-800 hover:bg-slate-700 border border-slate-700/60 p-3 rounded-2xl flex flex-col items-center text-center group transition">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-store text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-medium text-slate-300">Bursa Warga</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Demographics Card -->
+                <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-700/60 pb-2">
+                        <span class="text-xs font-bold text-slate-300 flex items-center gap-2">
+                            <i class="fa-solid fa-users-between-lines text-emerald-400"></i> Kartu Keluarga (KK) & Anggota
+                        </span>
+                        <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-mono">${state.userProfile.kk}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                            <p class="text-[10px] text-slate-400">Status Tinggal</p>
+                            <p class="font-bold text-slate-200">${state.userProfile.status}</p>
+                        </div>
+                        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                            <p class="text-[10px] text-slate-400">Jumlah Terdaftar</p>
+                            <p class="font-bold text-slate-200">${state.userProfile.familyMembers} Anggota Jiwa</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Ticketing Reports Overview -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Status Laporan Terkait</h3>
+                        <button onclick="openReportModal()" class="text-xs text-emerald-400 hover:underline flex items-center gap-1 font-semibold">
+                            <i class="fa-solid fa-plus text-[10px]"></i> Lapor Baru
+                        </button>
+                    </div>
+                    ${state.reports.map(r => `
+                        <div class="bg-slate-800/90 border border-slate-700/80 p-3 rounded-2xl flex items-center justify-between shadow-sm">
+                            <div class="space-y-0.5">
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-bold text-xs text-slate-100">${r.title}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${r.status === 'Resolved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
+                                        ${r.status}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-400"><i class="fa-solid fa-location-dot text-[10px] mr-1"></i>${r.location}</p>
+                            </div>
+                            <button onclick="viewReportDetail('${r.id}')" class="text-slate-400 hover:text-white p-2 text-xs">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // KTA Digital Modal Generator
+        function openKTAModal() {
+            const html = `
+                <div class="text-center space-y-4">
+                    <div class="inline-block bg-gradient-to-tr from-emerald-600 to-teal-500 p-3 rounded-2xl text-white shadow-lg">
+                        <i class="fa-solid fa-id-card text-3xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-white">Kartu Tanda Anggota (KTA)</h3>
+                        <p class="text-xs text-slate-400">Digital Identity QR Code Warga Lingkungan</p>
+                    </div>
+
+                    <!-- Visual Card Display -->
+                    <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-emerald-500/30 p-4 rounded-2xl text-left space-y-3 relative overflow-hidden shadow-xl">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Republik Indonesia</p>
+                                <p class="text-xs font-bold text-white">KTA DUSUN MELATI / KEL. ASRI</p>
+                            </div>
+                            <span class="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">AKTIF</span>
+                        </div>
+                        <div class="flex items-center space-x-3 pt-2">
+                            <div class="bg-white p-2 rounded-xl shadow shrink-0">
+                                <!-- Generated Inline SVG QR Code -->
+                                <svg class="w-24 h-24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect width="100" height="100" fill="white"/>
+                                    <path d="M10 10H40V40H10V10ZM15 15V35H35V15H15Z" fill="#0f172a"/>
+                                    <path d="M20 20H30V30H20V20Z" fill="#0f172a"/>
+                                    <path d="M60 10H90V40H60V10ZM65 15V35H85V15H65Z" fill="#0f172a"/>
+                                    <path d="M70 20H80V30H70V20Z" fill="#0f172a"/>
+                                    <path d="M10 60H40V90H10V60ZM15 65V85H35V65H15Z" fill="#0f172a"/>
+                                    <path d="M20 70H30V80H20V70Z" fill="#0f172a"/>
+                                    <path d="M50 50H60V60H50V50Z" fill="#0f172a"/>
+                                    <path d="M70 70H90V90H70V70Z" fill="#0f172a"/>
+                                    <path d="M50 75H65V90H50V75Z" fill="#0f172a"/>
+                                </svg>
+                            </div>
+                            <div class="text-xs space-y-1 truncate">
+                                <p class="font-bold text-white">${state.userProfile.name}</p>
+                                <p class="text-slate-400 text-[11px]">NIK: ${state.userProfile.nik}</p>
+                                <p class="text-slate-400 text-[11px] truncate">${state.userProfile.address}</p>
+                                <p class="text-[10px] font-mono text-emerald-400 pt-1">ID Token: ${state.userProfile.ktaCode}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-slate-400 italic">
+                        <i class="fa-solid fa-circle-info mr-1"></i> Tunjukkan QR Code ini ke petugas untuk verifikasi Bansos, Presensi Gotong Royong, atau Pos Ronda.
+                    </p>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function approveUser(id) {
+            state.pendingUsers = state.pendingUsers.filter(u => u.id !== id);
+            showNotification('Warga baru telah disetujui dan diverifikasi!');
+            renderCurrentTab();
+        }
+
+        // --- 2. FINANCIALS MODULE VIEW ---
+        function renderFinancialsView() {
+            return `
+                <div class="space-y-4">
+                    <!-- Top Ledger Banner -->
+                    <div class="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border border-blue-800/50 p-4 rounded-2xl shadow-xl space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-chart-line text-blue-400"></i> Buku Kas Transparan Lingkungan
+                            </span>
+                            <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-semibold">Publik & Terbuka</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <p class="text-[10px] text-slate-400">Pemasukan</p>
+                                <p class="text-xs font-bold text-emerald-400">Rp ${(state.ledger.pemasukan).toLocaleString('id-ID')}</p>
+                            </div>
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <p class="text-[10px] text-slate-400">Pengeluaran</p>
+                                <p class="text-xs font-bold text-rose-400">Rp ${(state.ledger.pengeluaran).toLocaleString('id-ID')}</p>
+                            </div>
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <p class="text-[10px] text-slate-400">Saldo Kas</p>
+                                <p class="text-xs font-bold text-blue-400">Rp ${(state.ledger.saldo).toLocaleString('id-ID')}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Cash Input for Kepling / RT -->
+                    ${(state.role === 'KEPLING' || state.role === 'RTRW') ? `
+                        <div class="bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-2xl flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-bold text-emerald-300">Pencatatan Tunai Lapangan</p>
+                                <p class="text-[10px] text-emerald-400/80">Input pembayaran iuran warga lansia / manual</p>
+                            </div>
+                            <button onclick="openCashInputModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-xl font-semibold shadow">
+                                <i class="fa-solid fa-plus mr-1"></i> Input Tunai
+                            </button>
+                        </div>
+                    ` : ''}
+
+                    <!-- User Tagihan Iuran Status -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tagihan Iuran Saya</h3>
+                        ${state.dues.map(d => `
+                            <div class="bg-slate-800/90 border border-slate-700/80 p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
+                                <div class="space-y-1">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="font-bold text-xs text-white">${d.month}</span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${d.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}">
+                                            ${d.status === 'PAID' ? 'LUNAS' : 'BELUM BAYAR'}
+                                        </span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-400">${d.type}</p>
+                                    <p class="text-xs font-bold text-slate-200">Rp ${d.amount.toLocaleString('id-ID')}</p>
+                                </div>
+                                <div>
+                                    ${d.status === 'UNPAID' ? `
+                                        <button onclick="openPaymentModal('${d.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition">
+                                            Bayar QRIS / E-Wallet
+                                        </button>
+                                    ` : `
+                                        <div class="text-right">
+                                            <span class="text-[10px] text-slate-400 block">Metode: ${d.method}</span>
+                                            <span class="text-[10px] text-emerald-400 font-medium">Tercatat di Kas</span>
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Ledger Visual Chart -->
+                    <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-2">
+                        <h4 class="text-xs font-bold text-slate-300">Grafik Arus Kas Lingkungan (Bulan Ini)</h4>
+                        <div class="h-40 relative">
+                            <canvas id="ledgerChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function initLedgerChart() {
+            setTimeout(() => {
+                const ctx = document.getElementById('ledgerChart');
+                if (!ctx) return;
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Minggu 1', 'Minggu 2', 'Minggu 3', 'Minggu 4'],
+                        datasets: [
+                            { label: 'Pemasukan (Rp)', data: [3500000, 4200000, 2800000, 3750000], backgroundColor: '#10b981' },
+                            { label: 'Pengeluaran (Rp)', data: [1200000, 2500000, 3000000, 2000000], backgroundColor: '#f43f5e' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+                        scales: {
+                            x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+                            y: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#334155' } }
+                        }
+                    }
+                });
+            }, 50);
+        }
+
+        function openPaymentModal(dueId) {
+            const due = state.dues.find(d => d.id === dueId);
+            const html = `
+                <div class="space-y-4">
+                    <div class="text-center">
+                        <h3 class="font-bold text-lg text-white">Payment Gateway Mandiri</h3>
+                        <p class="text-xs text-slate-400">Pembayaran Iuran ${due.month}</p>
+                    </div>
+                    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center space-y-1">
+                        <p class="text-xs text-slate-400">Total Tagihan</p>
+                        <p class="text-xl font-extrabold text-emerald-400">Rp ${due.amount.toLocaleString('id-ID')}</p>
+                    </div>
+
+                    <!-- Simulated QRIS Screen -->
+                    <div class="bg-white p-4 rounded-2xl text-center text-slate-900 space-y-2 max-w-[240px] mx-auto shadow-lg">
+                        <p class="font-extrabold text-xs tracking-widest text-rose-600">QRIS NATIONAL</p>
+                        <div class="bg-slate-100 p-2 rounded-lg inline-block border border-slate-200">
+                            <svg class="w-36 h-36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect width="100" height="100" fill="white"/>
+                                <path d="M5 5H45V45H5V5ZM10 10V40H40V10H10Z" fill="#000"/>
+                                <path d="M55 5H95V45H55V5ZM60 10V40H90V10H60Z" fill="#000"/>
+                                <path d="M5 55H45V95H5V55ZM10 60V90H40V60H10Z" fill="#000"/>
+                                <path d="M20 20H30V30H20V20Z" fill="#000"/>
+                                <path d="M70 20H80V30H70V20Z" fill="#000"/>
+                                <path d="M20 70H30V80H20V70Z" fill="#000"/>
+                                <path d="M55 55H70V70H55V55Z" fill="#000"/>
+                                <path d="M75 75H95V95H75V75Z" fill="#000"/>
+                            </svg>
+                        </div>
+                        <p class="text-[10px] text-slate-500 font-semibold">Scan via GoPay, OVO, Dana, ShopeePay, atau Mobile Banking</p>
+                    </div>
+
+                    <button onclick="confirmPayment('${dueId}')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl font-bold text-xs transition shadow-lg">
+                        Simulasi Pembayaran Berhasil
+                    </button>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function confirmPayment(dueId) {
+            const due = state.dues.find(d => d.id === dueId);
+            if (due) {
+                due.status = 'PAID';
+                due.method = 'QRIS Auto';
+                state.ledger.pemasukan += due.amount;
+                state.ledger.saldo += due.amount;
+            }
+            closeModal();
+            showNotification('Pembayaran Iuran Berhasil Diterima!');
+            renderCurrentTab();
+        }
+
+        function openCashInputModal() {
+            const html = `
+                <div class="space-y-3">
+                    <h3 class="font-bold text-base text-white">Input Pembayaran Tunai (Kepling)</h3>
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Nama Warga / NIK</label>
+                            <input type="text" id="cash-warga" placeholder="Contoh: Pak Supri (RT 03)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Jumlah Pembayaran (Rp)</label>
+                            <input type="number" id="cash-amount" value="35000" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                    <button onclick="submitCashInput()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition">
+                        Simpan ke Buku Kas
+                    </button>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function submitCashInput() {
+            const amount = parseInt(document.getElementById('cash-amount').value) || 35000;
+            const name = document.getElementById('cash-warga').value || 'Warga Tunai';
+            state.ledger.pemasukan += amount;
+            state.ledger.saldo += amount;
+            state.ledger.items.unshift({ id: Date.now(), title: `Iuran Tunai (${name})`, amount: amount, type: 'IN', date: 'Hari Ini' });
+            closeModal();
+            showNotification('Pencatatan Tunai Berhasil Disimpan!');
+            renderCurrentTab();
+        }
+
+        // --- 3. E-SURAT ADMINISTRASI & DIGITAL SIGNATURE MODULE ---
+        function renderServicesView() {
+            return `
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-sm font-bold text-white">E-Surat & Administrasi Digital</h2>
+                            <p class="text-[11px] text-slate-400">Pengajuan Surat Pengantar Resmi Ber-TTD Digital</p>
+                        </div>
+                        <button onclick="openNewLetterModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition shadow">
+                            <i class="fa-solid fa-pen-to-square mr-1"></i> Ajukan Surat
+                        </button>
+                    </div>
+
+                    <!-- Letters List -->
+                    <div class="space-y-2.5">
+                        ${state.letters.map(l => `
+                            <div class="bg-slate-800/90 border border-slate-700 p-3.5 rounded-2xl space-y-2 shadow-sm">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-100 block">${l.type}</span>
+                                        <p class="text-[11px] text-slate-400">Pemohon: ${l.applicant}</p>
+                                        <p class="text-[11px] text-slate-400">Keperluan: ${l.purpose}</p>
+                                    </div>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${l.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}">
+                                        ${l.status === 'APPROVED' ? 'DISETUJUI (PDF SIAP)' : 'PROSES REVIEW'}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center border-t border-slate-700/60 pt-2 text-[11px]">
+                                    <span class="text-slate-400 font-mono">${l.code || 'No. Reg Pending'}</span>
+                                    
+                                    ${state.role === 'KEPLING' && l.status === 'PENDING' ? `
+                                        <button onclick="approveLetter('${l.id}')" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg font-bold text-xs transition">
+                                            <i class="fa-solid fa-signature mr-1"></i> Tanda Tangan & Cap
+                                        </button>
+                                    ` : `
+                                        ${l.status === 'APPROVED' ? `
+                                            <button onclick="previewPDFModal('${l.id}')" class="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1">
+                                                <i class="fa-solid fa-file-pdf"></i> Unduh Document PDF
+                                            </button>
+                                        ` : '<span class="text-slate-400 italic">Menunggu Kepling</span>'}
+                                    `}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function openNewLetterModal() {
+            const html = `
+                <div class="space-y-3">
+                    <h3 class="font-bold text-base text-white">Form Pengajuan Surat Pengantar</h3>
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Jenis Surat</label>
+                            <select id="letter-type" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none">
+                                <option>Surat Keterangan Domisili</option>
+                                <option>Surat Keterangan Usaha (SKU)</option>
+                                <option>Surat Keterangan Tidak Mampu (SKTM)</option>
+                                <option>Surat Pengantar Nikah / Kematian</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Keperluan Pengajuan</label>
+                            <textarea id="letter-purpose" placeholder="Contoh: Persyaratan pembuatan SIM / Rekening Bank" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <button onclick="submitLetterRequest()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition">
+                        Kirim Pengajuan ke Kepling
+                    </button>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function submitLetterRequest() {
+            const type = document.getElementById('letter-type').value;
+            const purpose = document.getElementById('letter-purpose').value || 'Keperluan Administrasi';
+            state.letters.unshift({
+                id: `SRT-${Math.floor(Math.random()*900 + 100)}`,
+                type: type,
+                applicant: state.userProfile.name,
+                purpose: purpose,
+                status: 'PENDING',
+                date: 'Hari Ini',
+                code: 'SKD/2026/VIII/' + Math.floor(Math.random()*100)
+            });
+            closeModal();
+            showNotification('Surat berhasil diajukan! Menunggu penandatanganan Kepling.');
+            renderCurrentTab();
+        }
+
+        function approveLetter(id) {
+            const l = state.letters.find(item => item.id === id);
+            if (l) {
+                l.status = 'APPROVED';
+                showNotification('Surat telah ditandatangani secara digital dengan enkripsi SHA-256!');
+                renderCurrentTab();
+            }
+        }
+
+        function previewPDFModal(id) {
+            const l = state.letters.find(item => item.id === id);
+            const html = `
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                        <span class="text-xs font-bold text-emerald-400">PDF PREVIEW DOCUMENT</span>
+                        <span class="text-[10px] font-mono text-slate-400">SHA-256 VERIFIED</span>
+                    </div>
+
+                    <!-- Formatted Document Paper Simulation -->
+                    <div class="bg-white text-slate-900 p-5 rounded-lg text-[11px] space-y-3 shadow-inner font-serif leading-relaxed">
+                        <div class="text-center border-b-2 border-slate-900 pb-2 space-y-0.5">
+                            <h4 class="font-bold text-xs uppercase tracking-wide">PEMERINTAH KOTA / KABUPATEN</h4>
+                            <h3 class="font-extrabold text-sm uppercase">KECAMATAN ASRI - DUSUN MELATI</h3>
+                            <p class="text-[9px] font-sans">Alamat: Jl. Utama Dusun Melati No. 01 Telp: (061) 889922</p>
+                        </div>
+
+                        <div class="text-center py-1">
+                            <u class="font-bold uppercase text-xs">${l.type}</u>
+                            <p class="text-[10px] font-sans">Nomor: ${l.code}</p>
+                        </div>
+
+                        <p>Yang bertanda tangan di bawah ini Kepala Lingkungan / Dusun Melati menerangkan bahwa:</p>
+                        <table class="w-full text-[10px] font-sans">
+                            <tr><td class="w-24 font-semibold">Nama</td><td>: ${l.applicant}</td></tr>
+                            <tr><td class="font-semibold">NIK</td><td>: ${state.userProfile.nik}</td></tr>
+                            <tr><td class="font-semibold">Alamat</td><td>: ${state.userProfile.address}</td></tr>
+                            <tr><td class="font-semibold">Keperluan</td><td>: ${l.purpose}</td></tr>
+                        </table>
+
+                        <p>Demikian surat keterangan ini diterbitkan untuk dipergunakan sebagaimana mestinya.</p>
+
+                        <div class="flex justify-between items-end pt-4 font-sans">
+                            <div class="text-center border p-1 rounded bg-slate-50 border-slate-300">
+                                <svg class="w-12 h-12 mx-auto" viewBox="0 0 100 100">
+                                    <rect width="100" height="100" fill="#f8fafc"/>
+                                    <circle cx="50" cy="50" r="35" fill="none" stroke="#059669" stroke-width="4"/>
+                                    <text x="50" y="55" font-size="12" text-anchor="middle" fill="#059669" font-weight="bold">VALID</text>
+                                </svg>
+                                <span class="text-[8px] text-slate-500 block">QR Verifikasi</span>
+                            </div>
+                            <div class="text-center space-y-1">
+                                <p class="text-[9px]">Dusun Melati, ${l.date}</p>
+                                <p class="text-[9px] font-bold">Kepala Lingkungan / Dusun</p>
+                                <div class="py-1 text-emerald-700 font-extrabold text-xs italic">
+                                    [ E-SIGNED SHA-256 ]
+                                </div>
+                                <p class="text-[9px] font-bold underline">H. Ahmad Dahlan</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="showNotification('File PDF Berhasil Diunduh!'); closeModal();" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl text-xs font-bold transition">
+                        <i class="fa-solid fa-download mr-1"></i> Unduh PDF Resmi
+                    </button>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        // --- 4. TICKETING & REPORTING SYSTEM ---
+        function openReportModal() {
+            const html = `
+                <div class="space-y-3">
+                    <h3 class="font-bold text-base text-white">Lapor Pak Kepling (Ticketing System)</h3>
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Judul Laporan Kendala</label>
+                            <input type="text" id="rpt-title" placeholder="Contoh: Sampah menumpuk / Tetangga bising" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Kategori Laporan</label>
+                            <select id="rpt-cat" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none">
+                                <option>Fasilitas Umum</option>
+                                <option>Kebersihan / Sampah</option>
+                                <option>Ketertiban & Kebisingan</option>
+                                <option>Keamanan Lingkungan</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Lokasi Geotagging</label>
+                            <input type="text" id="rpt-loc" value="Jl. Kenanga RT 03 (GPS Auto Detected)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-slate-300 focus:outline-none font-mono text-[11px]" readonly>
+                        </div>
+                    </div>
+                    <button onclick="submitReport()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition">
+                        Kirim Laporan Berfoto
+                    </button>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function submitReport() {
+            const title = document.getElementById('rpt-title').value || 'Pengaduan Warga';
+            const cat = document.getElementById('rpt-cat').value;
+            state.reports.unshift({
+                id: `RPT-${Math.floor(Math.random()*900 + 100)}`,
+                title: title,
+                location: 'Jl. Kenanga RT 03',
+                reporter: state.userProfile.name,
+                category: cat,
+                status: 'In Progress',
+                date: 'Hari Ini',
+                img: 'https://placehold.co/400x250/1e293b/64748b?text=Bukti+Foto+Kamera'
+            });
+            closeModal();
+            showNotification('Laporan Geotagged berhasil dikirim ke Kepling!');
+            renderCurrentTab();
+        }
+
+        function viewReportDetail(id) {
+            const r = state.reports.find(item => item.id === id);
+            const html = `
+                <div class="space-y-3 text-xs">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-sm text-white">${r.title}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${r.status === 'Resolved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
+                            ${r.status}
+                        </span>
+                    </div>
+                    <img src="${r.img}" class="w-full h-36 object-cover rounded-xl border border-slate-700">
+                    <div class="space-y-1 text-slate-300">
+                        <p><strong>Kategori:</strong> ${r.category}</p>
+                        <p><strong>Pelapor:</strong> ${r.reporter}</p>
+                        <p><strong>Lokasi:</strong> ${r.location}</p>
+                    </div>
+
+                    ${state.role === 'KEPLING' && r.status !== 'Resolved' ? `
+                        <button onclick="resolveReport('${r.id}')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl font-bold transition">
+                            Tandai Selesai (Unggah Bukti Penyelesaian)
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function resolveReport(id) {
+            const r = state.reports.find(item => item.id === id);
+            if (r) {
+                r.status = 'Resolved';
+                closeModal();
+                showNotification('Status laporan telah diperbarui menjadi Selesai!');
+                renderCurrentTab();
+            }
+        }
+
+        // --- 5. PANIC BUTTON 3-SECOND SYSTEM ---
+        function renderPanicView() {
+            return `
+                <div class="space-y-4 text-center">
+                    <div>
+                        <h2 class="text-base font-extrabold text-rose-500 flex items-center justify-center gap-2 uppercase tracking-wider">
+                            <i class="fa-solid fa-triangle-exclamation animate-bounce"></i> Panic Button Emergency
+                        </h2>
+                        <p class="text-xs text-slate-400">Tekan dan Tahan Tombol 3 Detik untuk Kirim Sinyal Darurat</p>
+                    </div>
+
+                    <!-- Hold 3-Second Interactive Trigger Button -->
+                    <div class="py-6 flex justify-center">
+                        <div class="relative panic-btn-wrapper">
+                            <!-- Circular Progress Ring SVG -->
+                            <svg class="w-48 h-48 transform -rotate-90" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="42" stroke="rgba(225, 29, 72, 0.2)" stroke-width="8" fill="transparent" />
+                                <circle id="panic-ring" cx="50" cy="50" r="42" stroke="#f43f5e" stroke-width="8" fill="transparent" 
+                                    stroke-dasharray="263.89" stroke-dashoffset="263.89" stroke-linecap="round" class="transition-all duration-75"/>
+                            </svg>
+
+                            <button id="panic-hold-btn" class="absolute inset-4 rounded-full bg-gradient-to-br from-rose-600 to-red-800 text-white flex flex-col items-center justify-center shadow-2xl border-4 border-rose-500/40 active:scale-95 transition transform">
+                                <i class="fa-solid fa-hand-pointer text-3xl mb-1 animate-pulse"></i>
+                                <span class="text-xs font-black tracking-wider uppercase">TAHAN 3 DETIK</span>
+                                <span class="text-[9px] text-rose-200" id="panic-timer-text">Sinyal Alarm</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Category Emergency Selector -->
+                    <div class="bg-slate-800/80 border border-slate-700 p-3 rounded-2xl text-left space-y-2">
+                        <label class="text-xs font-bold text-slate-300 block">Kategori Darurat Terpilih:</label>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <button onclick="selectPanicCategory('Kebakaran')" class="p-2 bg-slate-900 border border-rose-500/40 text-rose-300 rounded-xl text-left flex items-center gap-2 font-medium">
+                                <i class="fa-solid fa-fire text-rose-500"></i> Kebakaran
+                            </button>
+                            <button onclick="selectPanicCategory('Maling/Kriminal')" class="p-2 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl text-left flex items-center gap-2 font-medium">
+                                <i class="fa-solid fa-user-ninja text-amber-500"></i> Kriminal / Maling
+                            </button>
+                            <button onclick="selectPanicCategory('Darurat Medis')" class="p-2 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl text-left flex items-center gap-2 font-medium">
+                                <i class="fa-solid fa-truck-medical text-emerald-500"></i> Medis / Ambulans
+                            </button>
+                            <button onclick="selectPanicCategory('Bencana Alam')" class="p-2 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl text-left flex items-center gap-2 font-medium">
+                                <i class="fa-solid fa-house-tsunami text-blue-500"></i> Bencana Alam
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Active Emergency Alerts List -->
+                    <div class="text-left space-y-2">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Log Panggilan Darurat Aktif</h3>
+                        ${state.panicAlerts.map(a => `
+                            <div class="bg-rose-950/40 border border-rose-500/40 p-3 rounded-2xl flex justify-between items-center">
+                                <div>
+                                    <p class="font-bold text-xs text-rose-300">${a.user} - ${a.category}</p>
+                                    <p class="text-[10px] text-slate-400">${a.location} • ${a.time}</p>
+                                </div>
+                                ${state.role === 'KEPLING' ? `
+                                    <button onclick="resolvePanic('${a.id}')" class="bg-rose-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold">
+                                        Matikan Status
+                                    </button>
+                                ` : `
+                                    <span class="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded font-mono font-bold">LIVE GPS</span>
+                                `}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        let selectedCategory = 'Kebakaran';
+        function selectPanicCategory(cat) {
+            selectedCategory = cat;
+            showNotification(`Kategori Darurat diubah ke: ${cat}`);
+        }
+
+        function initPanicListeners() {
+            setTimeout(() => {
+                const btn = document.getElementById('panic-hold-btn');
+                const ring = document.getElementById('panic-ring');
+                const timerText = document.getElementById('panic-timer-text');
+                if (!btn || !ring) return;
+
+                let startTime = 0;
+                let animFrame = null;
+                const fullDash = 263.89;
+
+                const startHold = (e) => {
+                    e.preventDefault();
+                    startTime = Date.now();
+                    
+                    const updateProgress = () => {
+                        const elapsed = Date.now() - startTime;
+                        const progress = Math.min(elapsed / 3000, 1);
+                        
+                        ring.style.strokeDashoffset = fullDash * (1 - progress);
+                        timerText.textContent = `${(3 - progress * 3).toFixed(1)} Detik...`;
+
+                        if (progress < 1) {
+                            animFrame = requestAnimationFrame(updateProgress);
+                        } else {
+                            // 3 SECONDS TRIGGERED!
+                            triggerEmergencyAlert();
+                            resetBtn();
+                        }
+                    };
+                    animFrame = requestAnimationFrame(updateProgress);
+                };
+
+                const resetBtn = () => {
+                    if (animFrame) cancelAnimationFrame(animFrame);
+                    ring.style.strokeDashoffset = fullDash;
+                    timerText.textContent = 'Sinyal Alarm';
+                };
+
+                btn.addEventListener('mousedown', startHold);
+                btn.addEventListener('touchstart', startHold);
+                btn.addEventListener('mouseup', resetBtn);
+                btn.addEventListener('mouseleave', resetBtn);
+                btn.addEventListener('touchend', resetBtn);
+            }, 100);
+        }
+
+        function triggerEmergencyAlert() {
+            state.panicActive = true;
+            playPanicSiren();
+
+            document.getElementById('emergency-banner').classList.remove('hidden');
+            document.getElementById('alert-title').textContent = `DARURAT: ${selectedCategory.toUpperCase()}!`;
+            document.getElementById('alert-subtitle').textContent = `${state.userProfile.name} - ${state.userProfile.address}`;
+
+            state.panicAlerts.unshift({
+                id: `SOS-${Math.floor(Math.random()*90 + 10)}`,
+                user: state.userProfile.name,
+                category: selectedCategory,
+                location: 'RT 03 (GPS: 3.321, 99.165)',
+                time: 'Baru Saja',
+                status: 'ACTIVE'
+            });
+
+            renderCurrentTab();
+        }
+
+        function silenceAlarm() {
+            stopPanicSiren();
+            document.getElementById('emergency-banner').classList.add('hidden');
+            state.panicActive = false;
+        }
+
+        function resolvePanic(id) {
+            silenceAlarm();
+            state.panicAlerts = state.panicAlerts.filter(a => a.id !== id);
+            showNotification('Status Darurat telah dipadamkan oleh Kepling.');
+            renderCurrentTab();
+        }
+
+        // --- 6. COMMUNITY HUB & BURSA WARGA MODULE ---
+        function renderHubView() {
+            return `
+                <div class="space-y-4">
+                    <!-- Tab Toggle Inside Hub -->
+                    <div class="flex border-b border-slate-800 text-xs font-bold text-slate-400">
+                        <button onclick="switchHubTab('announcement')" id="hub-tab-announcement" class="py-2 px-4 border-b-2 border-emerald-500 text-emerald-400">
+                            Papan Pengumuman
+                        </button>
+                        <button onclick="switchHubTab('ronda')" id="hub-tab-ronda" class="py-2 px-4 border-b-2 border-transparent hover:text-white">
+                            Poskamling & Ronda
+                        </button>
+                        <button onclick="switchHubTab('market')" id="hub-tab-market" class="py-2 px-4 border-b-2 border-transparent hover:text-white">
+                            Bursa Warga (UMKM)
+                        </button>
+                    </div>
+
+                    <!-- Dynamic Hub Content Container -->
+                    <div id="hub-subcontent" class="space-y-3">
+                        ${renderAnnouncementsSubtab()}
+                    </div>
+                </div>
+            `;
+        }
+
+        function switchHubTab(subtab) {
+            ['announcement', 'ronda', 'market'].forEach(t => {
+                const btn = document.getElementById(`hub-tab-${t}`);
+                if (!btn) return;
+                if (t === subtab) {
+                    btn.className = "py-2 px-4 border-b-2 border-emerald-500 text-emerald-400 font-bold";
+                } else {
+                    btn.className = "py-2 px-4 border-b-2 border-transparent text-slate-400 hover:text-white font-normal";
+                }
+            });
+
+            const sub = document.getElementById('hub-subcontent');
+            if (subtab === 'announcement') sub.innerHTML = renderAnnouncementsSubtab();
+            if (subtab === 'ronda') sub.innerHTML = renderRondaSubtab();
+            if (subtab === 'market') sub.innerHTML = renderMarketSubtab();
+        }
+
+        function renderAnnouncementsSubtab() {
+            return `
+                ${state.role === 'KEPLING' ? `
+                    <button onclick="openBroadcastModal()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 rounded-xl font-bold shadow transition mb-2">
+                        <i class="fa-solid fa-bullhorn mr-1"></i> Buat Broadcast Pengumuman Resmi
+                    </button>
+                ` : ''}
+                <div class="space-y-2.5">
+                    ${state.announcements.map(a => `
+                        <div class="bg-slate-800/80 border border-slate-700 p-3.5 rounded-2xl space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-bold text-white">${a.title}</span>
+                                <span class="text-[10px] bg-slate-700 text-emerald-400 px-2 py-0.5 rounded-full font-semibold">${a.tag}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300 leading-relaxed">${a.content}</p>
+                            <span class="text-[10px] text-slate-500 block pt-1"><i class="fa-regular fa-clock mr-1"></i>${a.date}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderRondaSubtab() {
+            return `
+                <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                        <span class="text-xs font-bold text-white"><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i> Jadwal Ronda Malam Ini</span>
+                        <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">Regu 3</span>
+                    </div>
+                    <p class="text-xs text-slate-300">Petugas Terjadwal (Kamis Malam):</p>
+                    <ul class="text-xs text-slate-400 space-y-1 list-disc list-inside font-mono">
+                        <li>Budi Santoso (RT 03)</li>
+                        <li>Joko Susilo (RT 03)</li>
+                        <li>Hendra Wijaya (RT 02)</li>
+                    </ul>
+
+                    <div class="pt-2">
+                        <button onclick="showNotification('Scan Absensi Poskamling Berhasil!')" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                            <i class="fa-solid fa-qrcode"></i> Scan QR Absensi Pos Ronda
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMarketSubtab() {
+            return `
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-300">Produk UMKM Antar Tetangga</span>
+                        <button onclick="openAddMarketModal()" class="text-xs text-emerald-400 font-bold hover:underline">
+                            + Jual Produk
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2.5">
+                        ${state.marketItems.map(m => `
+                            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-2.5 space-y-2 flex flex-col justify-between">
+                                <img src="${m.img}" class="w-full h-24 object-cover rounded-xl">
+                                <div>
+                                    <h4 class="font-bold text-xs text-white truncate">${m.name}</h4>
+                                    <p class="text-[11px] font-bold text-emerald-400">Rp ${m.price.toLocaleString('id-ID')}</p>
+                                    <p class="text-[10px] text-slate-400 truncate">${m.seller}</p>
+                                </div>
+                                <button onclick="showNotification('Menghubungi Penjual via WhatsApp...')" class="w-full bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 py-1 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1">
+                                    <i class="fa-brands fa-whatsapp"></i> Beli
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function openBroadcastModal() {
+            const html = `
+                <div class="space-y-3">
+                    <h3 class="font-bold text-base text-white">Broadcast Pengumuman Resmi</h3>
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Judul Pengumuman</label>
+                            <input type="text" id="bc-title" placeholder="Contoh: Pemadaman Listrik Sementara" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white">
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Isi Berita</label>
+                            <textarea id="bc-content" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <button onclick="submitBroadcast()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition">
+                        Kirim Push Notification ke Seluruh Warga
+                    </button>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function submitBroadcast() {
+            const title = document.getElementById('bc-title').value || 'Pengumuman Kepling';
+            const content = document.getElementById('bc-content').value || 'Informasi penting dari lingkungan.';
+            state.announcements.unshift({
+                id: Date.now(),
+                title: title,
+                content: content,
+                tag: 'Penting',
+                date: 'Hari Ini'
+            });
+            closeModal();
+            showNotification('Broadcast pengumuman terkirim ke smartphone warga!');
+            renderCurrentTab();
+        }
+
+        function openAddMarketModal() {
+            const html = `
+                <div class="space-y-3">
+                    <h3 class="font-bold text-base text-white">Tambah Produk Bursa Warga</h3>
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Nama Produk / Jasa</label>
+                            <input type="text" id="mkt-name" placeholder="Contoh: Kue Lapis Legit" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white">
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Harga (Rp)</label>
+                            <input type="number" id="mkt-price" placeholder="15000" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white">
+                        </div>
+                    </div>
+                    <button onclick="submitMarketItem()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition">
+                        Tayangkan di Bursa Warga
+                    </button>
+                </div>
+            `;
+            openModal(html);
+        }
+
+        function submitMarketItem() {
+            const name = document.getElementById('mkt-name').value || 'Produk Tetangga';
+            const price = parseInt(document.getElementById('mkt-price').value) || 20000;
+            state.marketItems.unshift({
+                id: Date.now(),
+                name: name,
+                price: price,
+                seller: `${state.userProfile.name} (Tetangga)`,
+                phone: '0812345678',
+                img: 'https://placehold.co/200x200/1e293b/38bdf8?text=Produk+UMKM'
+            });
+            closeModal();
+            showNotification('Produk Anda berhasil ditambahkan!');
+            renderCurrentTab();
+        }
+
+        // --- GLOBAL HELPER MODAL & TOAST FUNCTIONS ---
+        function openModal(htmlContent) {
+            document.getElementById('modal-body').innerHTML = htmlContent;
+            document.getElementById('modal-backdrop').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-backdrop').classList.add('hidden');
+        }
+
+        function showNotification(msg) {
+            const toast = document.createElement('div');
+            toast.className = "fixed top-6 right-6 bg-emerald-600 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-2xl z-50 flex items-center space-x-2 animate-bounce";
+            toast.innerHTML = `<i class="fa-solid fa-circle-check text-base"></i><span>${msg}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        // --- CLOCK CONTROLLER ---
+        setInterval(() => {
+            const now = new Date();
+            const hrs = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const el = document.getElementById('clock-time');
+            if (el) el.textContent = `${hrs}:${mins}`;
+        }, 1000);
+
+        // INITIAL RENDERING ON LOAD
+        window.onload = function() {
+            renderCurrentTab();
+        };
+    </script>
+</body>
+</html>
