@@ -3,6 +3,7 @@
   "name": "si-lingkungan",
   "cleanUrls": true,
   "trailingSlash": false,
+  "outputDirectory": "public",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
